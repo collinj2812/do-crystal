@@ -285,12 +285,12 @@ class PBE:
                 raise ValueError('Please provide number of finite elements.')
             if 'n_col' not in kwargs:
                 raise ValueError('Please provide number of collocation points per element.')
-            if 'n_linear' not in kwargs:
-                raise ValueError('Please provide number of linearly spaced elements.')
-            if 'step_linear' not in kwargs:
-                raise ValueError('Please provide step size for linearly spaced elements.')
-            if 'geometric_factor' not in kwargs:
-                raise ValueError('Please provide geometric factor.')
+            # if 'n_linear' not in kwargs:
+            #     raise ValueError('Please provide number of linearly spaced elements.')
+            # if 'step_linear' not in kwargs:
+            #     raise ValueError('Please provide step size for linearly spaced elements.')
+            # if 'geometric_factor' not in kwargs:
+            #     raise ValueError('Please provide geometric factor.')
             if 'D_a' not in kwargs:
                 raise ValueError('Please provide artificial diffusion coefficient.')
             if 'domain' not in kwargs:
@@ -300,9 +300,12 @@ class PBE:
 
             self.n_elements = kwargs['n_elements']
             self.n_col = kwargs['n_col']
-            self.n_linear = kwargs['n_linear']
-            self.step_linear = kwargs['step_linear']
-            self.geometric_factor = kwargs['geometric_factor']
+
+            # do not use geometric spacing --> n_linear = n_elements
+            self.n_linear = self.n_elements
+            self.step_linear = (kwargs['domain'][1] - kwargs['domain'][0]) / self.n_elements
+            self.geometric_factor = 0
+
             self.D_a = kwargs['D_a']
             self.domain = kwargs['domain']
             self.boundary_condition = kwargs['boundary_condition']
@@ -492,7 +495,7 @@ class PBE:
             for k in range(1, self.n_moments):
                 dot_mu[k] = k * G * states[k - 1] * tau + state_diff[k]
 
-            return dot_mu, 0, 0, 0
+            return dot_mu
 
         elif self.method == 'QMOM':
             if state_diff is None:
@@ -514,7 +517,7 @@ class PBE:
                 dot_mu[k] = k * G * (ca.sum1(L ** (k - 1) * w)) * tau + state_diff[k] + self.agg_fun(L, w, k,
                                                                                                      beta) * tau  # +break_sum(L, w, a, b, k, beta_a)
 
-            return dot_mu, 0, 0, 0
+            return dot_mu
 
         elif self.method == 'DPBE':
             states = ca.reshape(states, -1, 1)
@@ -904,7 +907,7 @@ class PBE:
             # dot_n[0,0] += N/(self.n_pos[0,1]-self.n_pos[0,0])
             # dot_n[0,1] += N/(self.n_pos[0,1]-self.n_pos[0,0])
 
-            return ca.reshape(dot_n * tau, -1, 1), 0, 0, 0
+            return ca.reshape(dot_n * tau, -1, 1)
         else:
             raise ValueError('Invalid PBE method. Please choose from SMOM, QMOM, DPBE, or OCFE.')
 
@@ -1007,7 +1010,7 @@ class PBE:
             # calculate moments for OCFE
             # lagrange polynomials are evaluated at different points in each element
             # higher number of evaluation points per element leads to better approximation of the integral but also to higher computational cost
-            n_xx = 1000  # number of evaluation points per element
+            n_xx = 100  # number of evaluation points per element
 
             n_full = ca.SX.zeros(self.n_elements, self.n_col)
             for element in range(self.n_elements):
