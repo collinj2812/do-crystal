@@ -532,6 +532,7 @@ class PBE:
             D_agg = ca.SX.zeros(self.no_class)
 
             if isinstance(beta, (ca.SX, ca.MX)) or beta != 0:
+                print('Calc agglomeration')
                 if self.spacing == 'geometric':
                     # function needed for calculation by Litster
                     S = lambda q: np.sum([np.arange(q + 1)])
@@ -656,7 +657,7 @@ class PBE:
             dn_dt[2:-1] = dn_Agg_dt[2:-1] * tau + dn_dt_G[2:-1] * tau + state_diff[2:-1]
             dn_dt[-1] = dn_Agg_dt[-1] * tau + dn_dt_G[-1] * tau + state_diff[-1]
 
-            return dn_dt, dn_Agg_dt, B_agg, dn_dt_G
+            return dn_dt
 
         elif self.method == 'OCFE':
             states = ca.reshape(states, self.n_elements, self.n_col - 2)
@@ -1122,7 +1123,7 @@ class MC_simulation:
                     - func: function to plot over histogram (e.g. an intial distribution or analytic solution) (optional)
         '''
 
-    def __init__(self, n_init: collections.abc.Callable[[float], float], G: float, B: float, beta: float, Dil: float,
+    def __init__(self, n_init, G: float, B: float, beta: float, Dil: float,
                  domain: list, coordinate: str, max: float = 0) -> None:
         '''
         Initialize the Monte Carlo simulation.
@@ -1142,24 +1143,29 @@ class MC_simulation:
         self.B = B
         self.beta = beta
         self.Dil = Dil
+        self.mu = None
         ###################################################
         self.m_0 = 1  # what is m_0? #######################
         ###################################################
         self.coordinate = coordinate
         self.domain = domain
+        self.cut_off_agg = 0
+        self.cut_off_nuc = 0
         if max:
             self.max = max
         else:
             self.max = np.max(n_init(np.linspace(*domain, 10000)))
 
-    def init_particles(self, n_particles: int, silence: bool = False) -> None:
+    def init_particles(self, n_particles: int = None, mu_3: float = None, silence: bool = False) -> None:
         '''
         Initialize the particles for the Monte Carlo simulation.
 
         Sample n_particles from the initial distribution by rejection method.
+        Or sample n_particles until certain mu_3 is reached.
 
         Parameters:
         - n_particles: number of particles to simulate
+
         - silence: suppress output
         '''
         self.n_particles = n_particles
@@ -1169,20 +1175,45 @@ class MC_simulation:
 
         # sample particles
         counter = 0
+        
+        if n_particles:
+            while counter < self.n_particles:
+                # generate random point within rectangle
+                r1 = np.random.uniform()
+                r2 = np.random.uniform()
 
-        while counter < self.n_particles:
-            # generate random point within rectangle
-            r1 = np.random.uniform()
-            r2 = np.random.uniform()
+                # scale to domain
+                r1_sc = r1 * (self.domain[1] - self.domain[0]) + self.domain[0]
+                r2_sc = r2 * self.max
 
-            # scale to domain
-            r1_sc = r1 * (self.domain[1] - self.domain[0]) + self.domain[0]
-            r2_sc = r2 * self.max
+                # accept if below pdf
+                if self.n_init(r1_sc) > r2_sc:
+                    self.particles.append(r1_sc)
+                    counter += 1
+        elif mu_3:
+            while True:
+                # generate random point within rectangle
+                r1 = np.random.uniform()
+                r2 = np.random.uniform()
 
-            # accept if below pdf
-            if self.n_init(r1_sc) > r2_sc:
-                self.particles.append(r1_sc)
-                counter += 1
+                # scale to domain
+                r1_sc = r1 * (self.domain[1] - self.domain[0]) + self.domain[0]
+                r2_sc = r2 * self.max
+
+                # accept if below pdf
+                if self.n_init(r1_sc) > r2_sc:
+                    self.particles.append(r1_sc)
+                    counter += 1
+
+                    # compute moments
+                    self.particles = np.array(self.particles)
+                    self.mu = np.array([np.sum(self.particles ** k) for k in range(6)])
+                    self.particles = self.particles.tolist()
+
+                    if self.mu[3] > mu_3:
+                        break
+        else:
+            raise ValueError('Please provide either number of particles or mu_3.')
 
         self.particles = np.array(self.particles)
         self.d10 = np.percentile(self.particles, 10)
@@ -1199,9 +1230,12 @@ class MC_simulation:
             print(f'Width of distribution: {self.d90 - self.d10}')
             print('-----------------------------------')
 
+        # compute moments
+        self.mu = np.array([np.sum(self.particles ** k) for k in range(6)])
+
     def simulate(self, t: float, dt: float = 0.1, silence: bool = False,
-                 G_fun_0: collections.abc.Callable[[float], float] = None,
-                 return_full_simulation: bool = False) -> None:
+                 G_fun_0: collections.abc.Callable[[float], float] = None, return_full_simulation: bool = False,
+                 G: float = None, B: float = None, beta: float = None, Dil: float = None, kernel_function = None) -> None:
         '''
         Make a step in the Monte Carlo simulation.
 
@@ -1213,6 +1247,16 @@ class MC_simulation:
         - silence: suppress output
         - G_fun: growth function (optional) (default: size-independent growth)
         '''
+
+        # check if new parameters are provided, otherwise use old ones
+        if G:
+            self.G = G
+        if B:
+            self.B = B
+        if beta:
+            self.beta = beta
+        if Dil:
+            self.Dil = Dil
 
         self.t = t
         self.dt = dt
@@ -1232,10 +1276,6 @@ class MC_simulation:
         # get some information about particle distribution before simulation
         no_particles_start = self.particles.shape[0]
 
-        # cut-off for agglomeration and nucleation events
-        cut_off_agg = 0
-        cut_off_nuc = 0
-
         time_start = time.perf_counter()
         for t in range(steps):
             # number of simulated samples
@@ -1249,9 +1289,9 @@ class MC_simulation:
                 # size-independent growth
                 self.particles = self.particles + self.G * dt
 
-            for sample in range(PopnNo):
-                # currently only constant growth implemented
-                pass
+            # for sample in range(PopnNo):
+            #     # currently only constant growth implemented
+            #     pass
 
             # calculate number of agglomeration events for given time-step
             m_0_next = self.m_0 - 0.5 * self.beta * self.m_0 ** 2 * dt
@@ -1259,29 +1299,83 @@ class MC_simulation:
 
             # can only simulate integer number of agglomeration events
             # --> round-off error is accumulated
-            AggNo = PopnNo * delta_m_0 / self.m_0 + cut_off_agg
+            AggNo = PopnNo * delta_m_0 / self.m_0 + self.cut_off_agg
+
             self.m_0 = m_0_next
-            cut_off_agg = AggNo - int(AggNo)
+            self.cut_off_agg = AggNo - int(AggNo)
             AggNo = int(AggNo)
+            
+            # print(f'{AggNo} agglomeration events for a population of {PopnNo} particles')
+            
 
             # perform agglomeration
-            for sample in range(AggNo):
-                # take 2 random samples and combine to single sample
-                samples = np.random.choice(self.particles, 2, replace=False)
-                self.particles = np.delete(self.particles, self.particles == samples[0])  # delete first sample
-                self.particles = np.delete(self.particles, self.particles == samples[1])  # delete second sample
+            # constant kernel if kernel_function is none
+            if kernel_function is None:
+                for sample in range(AggNo):
+                    # check if enough particles are available for agglomeration
+                    if self.particles.shape[0] < 2:
+                        break
+                    # take 2 random samples and combine to single sample
+                    samples = np.random.choice(self.particles, 2, replace=False)
+                    self.particles = np.delete(self.particles, self.particles == samples[0])  # delete first sample
+                    self.particles = np.delete(self.particles, self.particles == samples[1])  # delete second sample
 
-                if self.coordinate == 'L':
-                    self.particles = np.append(self.particles, (samples[0] ** 3 + samples[1] ** 3) ** (
-                            1 / 3))  # add new agglomerated sample
-                elif self.coordinate == 'V':
-                    self.particles = np.append(self.particles, (samples[0] + samples[1]))  # add new agglomerated sample
-                else:
-                    raise ValueError('Invalid coordinate. Please choose from L or V.')
+                    if self.coordinate == 'L':
+                        self.particles = np.append(self.particles, (samples[0] ** 3 + samples[1] ** 3) ** (
+                                1 / 3))  # add new agglomerated sample
+                    elif self.coordinate == 'V':
+                        self.particles = np.append(self.particles, (samples[0] + samples[1]))  # add new agglomerated sample
+                    else:
+                        raise ValueError('Invalid coordinate. Please choose from L or V.')
+            else:
+                # choose two particles at random and perform accept reject sampling
+
+                # normalize value
+                n_points = 100  # Resolution of the grid
+                sizes = np.linspace(1e-10, np.max(self.particles), n_points)
+                XX, YY = np.meshgrid(sizes, sizes)
+                max_kernel = np.max(kernel_function(XX,YY))
+
+                for sample in range(AggNo):
+                    # check if enough particles are available for agglomeration
+                    if self.particles.shape[0] < 2:
+                        break
+
+                    agglomeration_accepted = False
+                    while_counter = 0
+                    while not agglomeration_accepted:
+                        # take 2 random samples and combine to single sample
+                        samples = np.random.choice(self.particles, 2, replace=False)
+
+                        # accept if below kernel
+                        kernel_value = kernel_function(*samples)
+                        prob = kernel_value / max_kernel
+                        if np.random.uniform() < prob:
+                            self.particles = np.delete(self.particles, self.particles == samples[0])
+                            self.particles = np.delete(self.particles, self.particles == samples[1])
+                            if self.coordinate == 'L':
+                                self.particles = np.append(self.particles, (samples[0] ** 3 + samples[1] ** 3) ** (1 / 3))  # add new agglomerated sample
+                            elif self.coordinate == 'V':
+                                self.particles = np.append(self.particles, sum_of_samples)  # add new agglomerated sample
+                            else:
+                                raise ValueError('Invalid coordinate. Please choose from L or V.')
+                            agglomeration_accepted = True
+
+                        # throw error if while loop runs too long
+                        while_counter += 1
+                        if while_counter > 50000:
+                            print('Accept reject sampling for agglomeration did not converge. 1000 added to each crystal')
+                            # generate very bad results if agglomeration did not converge
+                            self.particles = self.particles + 10000
+                            break
+
+
+            # if AggNo > 0:
+            #     print('Agglomeration event')
 
             # nucleation
-            NuclNo = self.B * dt * PopnNo / self.m_0 + cut_off_nuc
-            cut_off_nuc = NuclNo - int(NuclNo)
+            NuclNo = self.B * dt * PopnNo / self.m_0 + self.cut_off_nuc
+            self.cut_off_nuc = NuclNo - int(NuclNo)
             NuclNo = int(NuclNo)
 
             # perform nucleation
@@ -1296,6 +1390,9 @@ class MC_simulation:
         self.d10 = np.percentile(self.particles, 10)
         self.d50 = np.percentile(self.particles, 50)
         self.d90 = np.percentile(self.particles, 90)
+
+        # update moments
+        self.mu = np.array([np.sum(self.particles ** k) for k in range(6)])
 
         if not (silence):
             # print some information about the simulation
