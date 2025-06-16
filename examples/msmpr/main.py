@@ -10,7 +10,8 @@ from examples.aux_functions import gaussian
 
 sys.path.append(os.path.join('..', '..' , 'pbe_sol'))
 sys.path.append(os.path.join('..'))
-from pbe import PBE
+from PBE import PBE
+import cryst
 
 import template_model
 import template_simulator
@@ -32,6 +33,7 @@ PBE.setup(**config['pbe'])
 mu = config['model']['mu']
 sigma = config['model']['sigma']
 n_init = lambda L: config['model']['N_0']*gaussian(L, mu, sigma)
+config['model']['kernel'] = cryst.constant_kernel
 
 n_seed = n_init(PBE.L_i)
 

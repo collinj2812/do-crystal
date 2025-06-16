@@ -3,11 +3,11 @@ import do_mpc
 import sys
 
 sys.path.append('pbe_sol')
-import pbe
+import PBE
 import cryst
 
 
-def model(PBE: pbe.PBE, **kwargs) -> do_mpc.model.Model:
+def model(PBE: PBE.PBE, **kwargs) -> do_mpc.model.Model:
     '''
     Model for MSMPR using PBE class.
 
@@ -29,15 +29,13 @@ def model(PBE: pbe.PBE, **kwargs) -> do_mpc.model.Model:
     c_p_j = kwargs['c_p_j']
     kv = kwargs['kv']
     V = kwargs['V']
+    kernel = kwargs['kernel']
 
+    # state_in represents seed crystals in inlet flow
     if PBE.method == 'OCFE':
         state_in = kwargs['state_in'][0]
     else:
         state_in = kwargs['state_in']
-
-    ###########################################################
-    kernel = cryst.constant_kernel
-    ###########################################################
 
     # define state variables for PBE from PBE class
     PBE_state = model.set_variable('_x', 'PBE_state', shape=(PBE.state_shape()[0]))
