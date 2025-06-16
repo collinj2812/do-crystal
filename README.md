@@ -98,21 +98,4 @@ Please make sure to update tests as appropriate.
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
-## Citation
 
-If you use this toolbox in your research, please cite:
-
-```bibtex
-@software{pbe_crystallizer,
-  author = {Your Name},
-  title = {Population Balance Equation Solver for Crystallization Systems},
-  year = {2024},
-  publisher = {GitHub},
-  url = {https://github.com/yourusername/pbe-crystallizer}
-}
-```
-
-## Contact
-
-- Your Name - [your.email@domain.com](mailto:your.email@domain.com)
-- Project Link: [https://github.com/yourusername/pbe-crystallizer](https://github.com/yourusername/pbe-crystallizer)
