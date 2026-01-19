@@ -1,13 +1,12 @@
 import casadi as ca
 import do_mpc
-import PBE as PBE_file
 
 
 import sys
 
-sys.path.append('../')
-import functions
-import cryst
+import pbe_sol.PBE as PBE_file
+import pbe_sol.functions as functions
+import pbe_sol.cryst as cryst
 
 
 def model(n_discr: int, PBE: PBE_file.PBE, **kwargs) -> do_mpc.model.Model:
@@ -219,7 +218,7 @@ def data_based_model(casadi_NN, l, no_states, no_inputs):
     c_in = cryst.solubility(T_in)
     T_env = 295
 
-    u_k = ca.vertcat(F, c_in, T_in, T_j_in, F_J, T_env)
+    u_k = ca.vertcat(F, F_J)
 
     # define input for NN
     x = ca.vertcat(*state_list)
@@ -239,7 +238,7 @@ def data_based_model(casadi_NN, l, no_states, no_inputs):
     c = model.set_expression('c', state_list[0][3])
 
     model.set_expression('set_size', 1e0 * (1e6*size - 1e6*set_size) ** 2)
-    model.set_expression('maximize_feed', -1e4*F)
+    model.set_expression('maximize_feed', -1e-6*F)
 
     # define rhs
     model.set_rhs('x_k-0', x_next)

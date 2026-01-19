@@ -267,3 +267,106 @@ def narx_data_input(states, inputs, l):
 
     X = np.vstack(X)
     return X
+
+def load_PBE_param(**kwargs):
+    '''
+    Function to load PBE parameters. Some parameters are optional. Function sets all parameters that are provided to
+    a dictionary.
+    '''
+    # create empty dictionary with keywords
+    param = {
+        'method': None,
+        'G': 0,
+        'N': 0,
+        'D': 0,
+        'kernel': None,
+        'beta': 0,
+        'boundary_condition': None,
+        'n_moments': None,
+        'scheme': None,
+        'spacing': None,
+        'no_class': None,
+        'q': None,
+        'L_0': None,
+        'domain': None,
+        'n_elements': None,
+        'n_col': None,
+        'n_linear': None,
+        'geometric_factor': None,
+        'step_linear': None,
+        'D_a': None,
+        'coordinate': None
+    }
+
+    # set parameters that are provided
+    for key, value in kwargs.items():
+        param[key] = value
+
+    return param
+
+
+
+def calculate_initial_distribution(PBE_obj, **kwargs):
+    '''
+    Function to calculate initial distribution. If n_initial is provided, use that. Else, use default distribution.
+    '''
+
+    # check if n_initial is provided
+    if kwargs['n_initial'] is not None:
+        n_init = kwargs['n_initial']
+    else:
+        n_init = lambda x: 0 * x
+
+    # check method within kwargs
+    if kwargs['method'] == 'SMOM' or kwargs['method'] == 'QMOM':
+        n_xx = 10001  # number of points for discretization to calculate initial distribution
+        lower_bound = kwargs['mu'] - 8 * kwargs['sigma']
+        if lower_bound < 0:
+            lower_bound = 0
+        xx = np.linspace(lower_bound, kwargs['mu'] + 8 * kwargs['sigma'], n_xx)
+        PBE_initial = np.array(
+            [scipy.integrate.simpson(n_init(xx) * xx ** i, x=xx) for i in range(PBE_obj.n_moments)]).reshape(-1, 1)
+        # PBE_initial = np.array([1,5,33.33,277.778,2777.78,32407.4])
+    elif kwargs['method'] == 'DPBE':
+        PBE_initial = n_init(PBE_obj.L_i)
+    elif kwargs['method'] == 'OCFE':
+        states_initial = ca.reshape(n_init(PBE_obj.n_pos), PBE_obj.state_shape()[0], 1)
+        alg_state_initial = n_init(PBE_obj.z_outer[0])
+        alg_z_initial = n_init(
+            np.array([val for i in range(len(PBE_obj.z_outer)) for val in (PBE_obj.z_outer[i], PBE_obj.z_outer[i])][
+                     1:-1]).reshape(
+                PBE_obj.n_elements, -1).T.flatten())
+
+        PBE_initial = [states_initial, alg_state_initial, alg_z_initial]
+    return PBE_initial
+
+def construct_input(F, F_J):
+    return np.array([F[0], 0.22, 350, 350, F_J[0], 295]).reshape(-1, 1)
+
+def MPC_input(x0, L_i, n_discr, n_classes):
+    x_PBE = np.array(x0[(n_discr-1)*n_classes:n_discr*n_classes])
+    x_cont = np.array(x0[n_discr*(n_classes+1)-1::n_discr])
+    median = np.array([find_x_at_percentile(L_i, x_PBE, 0.5)]).reshape(-1,1)
+    return np.concatenate([x_cont, median]).T
+
+def initialize_narx(x0, u0, l):
+    # return vector containing l times the initial state and initial input
+    if l > 1:
+        x_full = np.concatenate(np.array([x0.T for _ in range(l)]))
+        u_full = np.concatenate(np.array([u0.T for _ in range(l - 1)]))
+        return np.vstack((x_full, u_full.reshape(-1, 1)))
+    else:
+        return x0
+
+def narx(x_MPC, x_MPC_0, u, l):
+    n_u = u.shape[0]
+    n_x = x_MPC_0.shape[1]
+
+    x_old = x_MPC[:n_x * l]
+    u_old = x_MPC[n_x * l:]
+
+    if l > 1:
+        x_new = np.concatenate((x_MPC_0.T, x_old[:n_x * (l - 1)], u, u_old[:n_u * (l - 2)]))
+    else:
+        x_new = x_MPC_0.T
+    return x_new

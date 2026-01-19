@@ -5,6 +5,7 @@ from examples.aux_functions import SID, narx_data, TimeSeriesDataset, torch_mode
 import matplotlib.pyplot as plt
 import torch
 import time
+import pickle
 
 # load training data
 training_data_y = np.load('training_data_y.npy')
@@ -79,7 +80,7 @@ batch_size = 64
 hidden_dim = 100
 learning_rate = 1e-4
 weight_decay = 1e-6
-n_epochs = 200
+n_epochs = 2000
 
 train_dataset = TimeSeriesDataset(X_train, Y_train)
 val_dataset = TimeSeriesDataset(X_val, Y_val)
@@ -198,5 +199,12 @@ plt.plot(y_pred[:, state], label='sim')
 plt.plot(test_y[l:N_sim+l, state], label='true')
 plt.legend()
 plt.show()
+
+with open('db_model.pkl', 'wb') as f:
+    pickle.dump(narx_nn_casadi, f)
+    pickle.dump(l, f)
+    pickle.dump(no_states, f)
+    pickle.dump(no_inputs, f)
+
 
 sys.exit()

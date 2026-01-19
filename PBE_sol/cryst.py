@@ -21,7 +21,7 @@ def solubility(T: float) -> float:
     '''
     Calculate solubility for given temperature.
     '''
-    return 0.11238 * ca.exp(9.0849e-3 * (T - 273.15))  # Parameters from Wohlgemuth 2012
+    return 0.11238 * ca.exp(9.0849e-3 * (T - 273.15))  # Parameters from Wohlgemuth 2012 for L-Alanine/ water system
 
 
 def G(rel_S: float) -> float:

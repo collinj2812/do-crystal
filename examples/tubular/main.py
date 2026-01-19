@@ -62,7 +62,7 @@ u['T_env'] = 295
 
 import matplotlib.pyplot as plt
 # simulate once and plot data over time
-t_steps = 50000
+t_steps = 5000
 training_data = True
 if training_data:
     training_data_y = []
@@ -86,8 +86,8 @@ for i in range(t_steps):
         training_data_y.append(y)
         training_data_u.append(u_data)
 
-        prctg = 0.1
-        prob = 0.05
+        prctg = 0.3
+        prob = 0.1
         if np.random.uniform(0, 1) <= prob:
             u['F'] = np.random.uniform((1-prctg) * F_mean, (1+prctg) * F_mean)
         if np.random.uniform(0, 1) <= prob:

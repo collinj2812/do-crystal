@@ -4,8 +4,9 @@ import collections.abc
 import scipy
 import matplotlib.pyplot as plt
 import time
-import functions
-import cryst
+import pbe_sol.functions as functions
+import pbe_sol.cryst as cryst
+
 
 
 class PBE:
