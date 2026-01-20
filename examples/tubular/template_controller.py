@@ -17,11 +17,11 @@ def controller(db_model, l, t_step=10.0):
     mterm = db_model.aux['set_size']  # terminal cost
 
     mpc_obj.set_objective(lterm=lterm, mterm=mterm)
-    cost_rterm = 8e6
+    cost_rterm = 1e-2
     mpc_obj.set_rterm(F=cost_rterm * 1e1, F_J=cost_rterm)
 
     # scaling
-    scale_x = np.array([1e-1, 1e2, 1e2, 1e-3])
+    scale_x = np.array([1e2, 1e2, 1e-1, 1e-4])
     for k in range(l):
         mpc_obj.scaling['_x', f'x_k-{k}'] = scale_x
 
@@ -30,16 +30,16 @@ def controller(db_model, l, t_step=10.0):
         mpc_obj.scaling['_x', f'u_k-{k+1}'] = scale_u
 
 
-    # state constraints
+    # state constraints, state constraint is not active or necessary but left to show implementation
     mpc_obj.set_nl_cons('temperature',
                                  expr=-db_model.aux['T'] + db_model.tvp['T_constraint'],
                                  ub=0, soft_constraint=True, penalty_term_cons=1e-8)
 
     # input constraints
-    mpc_obj.bounds['lower', '_u', 'F'] = 0.9 * 0.003
-    mpc_obj.bounds['upper', '_u', 'F'] = 1.1 * 0.003
-    mpc_obj.bounds['lower', '_u', 'F_J'] = 0.9 * 0.04
-    mpc_obj.bounds['upper', '_u', 'F_J'] = 1.1 * 0.04
+    mpc_obj.bounds['lower', '_u', 'F'] = 0.8 * 0.002
+    mpc_obj.bounds['upper', '_u', 'F'] = 1.2 * 0.002
+    mpc_obj.bounds['lower', '_u', 'F_J'] = 0.8 * 0.03
+    mpc_obj.bounds['upper', '_u', 'F_J'] = 1.2 * 0.03
 
     # time varying state constraints
     tvp_template = mpc_obj.get_tvp_template()
@@ -47,7 +47,7 @@ def controller(db_model, l, t_step=10.0):
     def tvp_fun(t_now):
         ind = t_now
         tvp_template['_tvp', :, 'T_constraint'] = 310
-        tvp_template['_tvp', :, 'set_size'] = 0.00015
+        tvp_template['_tvp', :, 'set_size'] = 0.00018
         return tvp_template
 
     mpc_obj.set_tvp_fun(tvp_fun)

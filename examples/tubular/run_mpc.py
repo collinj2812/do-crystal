@@ -64,8 +64,8 @@ x0['PBE_state'] = np.concatenate([n_init_0.reshape(-1, 1) for i in range(config[
 
 
 u = simulator.u0
-F_mean = 0.003
-F_J_mean = 0.04
+F_mean = 0.002
+F_J_mean = 0.03
 
 u['F'] = F_mean
 u['c_in'] = 0.22
@@ -85,14 +85,14 @@ for t_i in range(t_steps):
 
     x_next = simulator.make_step(u_full)
     x_MPC_0 = MPC_input(x_next, PBE.L_i, config['initial']['n_discr'], config['pbe']['no_class'])
-    x_MPC = initialize_narx(x_MPC_0, np.array([F_mean, F_J_mean]), l)
+    x_MPC = narx(x_MPC, x_MPC_0, u_full, l)
     states.append(x_MPC_0)
 
 states = np.array(states).squeeze()
 
-c = states[:, 0]
-T = states[:, 1]
-T_j = states[:, 2]
+T = states[:, 0]
+T_j = states[:, 1]
+c = states[:, 2]
 size = states[:, 3]
 
 F = simulator.data['_u', 'F']

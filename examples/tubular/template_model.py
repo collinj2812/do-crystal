@@ -50,9 +50,9 @@ def model(n_discr: int, PBE: PBE_file.PBE, **kwargs) -> do_mpc.model.Model:
         PBE_alg_aux = model.set_variable('_x', 'PBE_alg_aux', shape=n_discr)
 
     # continuous phase
+    c = model.set_variable(var_type='_x', var_name='c', shape=(n_discr))
     T = model.set_variable(var_type='_x', var_name='T', shape=(n_discr))
     T_j = model.set_variable(var_type='_x', var_name='T_j', shape=(n_discr))
-    c = model.set_variable(var_type='_x', var_name='c', shape=(n_discr))
 
     F = model.set_variable(var_type='_u', var_name='F')
     c_in = model.set_variable(var_type='_u', var_name='c_in')
@@ -231,14 +231,14 @@ def data_based_model(casadi_NN, l, no_states, no_inputs):
     x_next = casadi_NN(input_NN)
 
     # expressions to access states
-    size = model.set_expression('size', state_list[0][0])
     # width = model.set_expression('width', state_list[0][1])
+    c = model.set_expression('c', state_list[0][0])
     T = model.set_expression('T', state_list[0][1])
     T_j = model.set_expression('T_j', state_list[0][2])
-    c = model.set_expression('c', state_list[0][3])
+    size = model.set_expression('size', state_list[0][3])
 
-    model.set_expression('set_size', 1e0 * (1e6*size - 1e6*set_size) ** 2)
-    model.set_expression('maximize_feed', -1e-6*F)
+    model.set_expression('set_size', 1e5 * (size - set_size) ** 2)
+    model.set_expression('maximize_feed', -1e-2 * F)
 
     # define rhs
     model.set_rhs('x_k-0', x_next)

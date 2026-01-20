@@ -49,8 +49,8 @@ x0['PBE_state'] = np.concatenate([n_init_0.reshape(-1, 1) for i in range(config[
 
 
 u = simulator.u0
-F_mean = 0.003
-F_J_mean = 0.04
+F_mean = 0.002
+F_J_mean = 0.03
 
 u['F'] = F_mean
 u['c_in'] = 0.22
@@ -62,7 +62,7 @@ u['T_env'] = 295
 
 import matplotlib.pyplot as plt
 # simulate once and plot data over time
-t_steps = 5000
+t_steps = 50000
 training_data = True
 if training_data:
     training_data_y = []
@@ -86,7 +86,7 @@ for i in range(t_steps):
         training_data_y.append(y)
         training_data_u.append(u_data)
 
-        prctg = 0.3
+        prctg = 0.2
         prob = 0.1
         if np.random.uniform(0, 1) <= prob:
             u['F'] = np.random.uniform((1-prctg) * F_mean, (1+prctg) * F_mean)

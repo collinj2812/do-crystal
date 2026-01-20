@@ -359,14 +359,16 @@ def initialize_narx(x0, u0, l):
         return x0
 
 def narx(x_MPC, x_MPC_0, u, l):
-    n_u = u.shape[0]
     n_x = x_MPC_0.shape[1]
 
     x_old = x_MPC[:n_x * l]
     u_old = x_MPC[n_x * l:]
 
+
+    n_u = int(x_MPC[n_x * l:].shape[0] / (l - 1))
+
     if l > 1:
-        x_new = np.concatenate((x_MPC_0.T, x_old[:n_x * (l - 1)], u, u_old[:n_u * (l - 2)]))
+        x_new = np.concatenate((x_MPC_0.T, x_old[:n_x * (l - 1)], u[0].reshape(-1, 1), u[4].reshape(-1, 1), u_old[:n_u * (l - 2)]))
     else:
         x_new = x_MPC_0.T
     return x_new
